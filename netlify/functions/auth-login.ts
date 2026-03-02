@@ -13,17 +13,18 @@ function normalizeUsername(u: string) {
   return u.trim().toUpperCase().replace(/\s+/g, "_");
 }
 
-// pbkdf2$$sha256$$120000$$salt$$derivedHex
+// expected: pbkdf2$sha256$120000$salt$derivedHex
 function verifyPbkdf2(password: string, stored: string): boolean {
   if (typeof stored !== "string") return false;
-  const parts = stored.split("$$");
-  if (parts.length !== 6) return false;
+
+  const parts = stored.split("$");
+  if (parts.length !== 5) return false;
   if (parts[0] !== "pbkdf2") return false;
 
-  const digest = parts[2];
-  const iter = Number(parts[3]);
-  const salt = parts[4];
-  const derivedHex = parts[5];
+  const digest = parts[1];
+  const iter = Number(parts[2]);
+  const salt = parts[3];
+  const derivedHex = parts[4];
 
   if (!digest || !Number.isFinite(iter) || iter < 1 || !salt || !derivedHex) return false;
 

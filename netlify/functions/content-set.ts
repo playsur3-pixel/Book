@@ -27,7 +27,7 @@ type MapContent = {
   strats: StratCard[];
 };
 
-const COOKIE_NAME = process.env.AUTH_COOKIE_NAME || "playsure_token";
+const COOKIE_NAME = process.env.AUTH_COOKIE_NAME || "adminbook";
 const JWT_SECRET = process.env.AUTH_JWT_SECRET || "dev-secret";
 
 function normalizeMap(v: string | null): MapKey | null {
