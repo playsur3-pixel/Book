@@ -2,6 +2,7 @@ import { createBrowserRouter, Navigate } from "react-router-dom";
 import App from "./App";
 import Login from "../pages/Login";
 import Home from "../pages/Home";
+import Admin from "../pages/Admin";
 
 import MirageStuffs from "../pages/stuffs/Mirage";
 import MirageStrats from "../pages/strats/Mirage";
@@ -26,6 +27,7 @@ export const router = createBrowserRouter([
     element: <App />,
     children: [
       { index: true, element: <Home /> },
+      { path: "admin", element: <Admin /> },
       { path: "stuffs/mirage", element: <MirageStuffs /> },
       { path: "strats/mirage", element: <MirageStrats /> },
       { path: "maps/mirage", element: <Navigate to="/stuffs/mirage" replace /> },
