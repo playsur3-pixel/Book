@@ -9,28 +9,26 @@ type LambdaEventLike = any;
 const COOKIE_NAME = process.env.AUTH_COOKIE_NAME || "adminbook";
 const JWT_SECRET = process.env.AUTH_JWT_SECRET || "dev-secret";
 
-// même normalisation que tes scripts admin
 function normalizeUsername(u: string) {
   return u.trim().toUpperCase().replace(/\s+/g, "_");
 }
 
-// attendu: pbkdf2$$sha256$$120000$$<salt>$$<derivedHex>
-function verifyPassword(password: string, stored: string): boolean {
-  if (!stored || !stored.startsWith("pbkdf2$$")) return false;
+// pbkdf2$$sha256$$120000$$salt$$derivedHex
+function verifyPbkdf2(password: string, stored: string): boolean {
+  if (typeof stored !== "string") return false;
   const parts = stored.split("$$");
   if (parts.length !== 6) return false;
+  if (parts[0] !== "pbkdf2") return false;
 
   const digest = parts[2];
   const iter = Number(parts[3]);
   const salt = parts[4];
   const derivedHex = parts[5];
 
-  if (!digest || !Number.isFinite(iter) || iter <= 0 || !salt || !derivedHex) return false;
+  if (!digest || !Number.isFinite(iter) || iter < 1 || !salt || !derivedHex) return false;
 
   const keylen = Buffer.from(derivedHex, "hex").length;
-  const computedHex = crypto
-    .pbkdf2Sync(password, salt, iter, keylen, digest as any)
-    .toString("hex");
+  const computedHex = crypto.pbkdf2Sync(password, salt, iter, keylen, digest as any).toString("hex");
 
   const a = Buffer.from(computedHex, "hex");
   const b = Buffer.from(derivedHex, "hex");
@@ -38,26 +36,22 @@ function verifyPassword(password: string, stored: string): boolean {
   return crypto.timingSafeEqual(a, b);
 }
 
-function buildSetCookie(name: string, value: string) {
+function cookieHeader(name: string, value: string) {
   const isProd = process.env.NODE_ENV === "production";
-  // SameSite=Lax suffit ici, Secure seulement en prod
-  const parts = [
+  return [
     `${name}=${value}`,
     "Path=/",
     "HttpOnly",
     "SameSite=Lax",
-    isProd ? "Secure" : "",
-    // 14 jours
     `Max-Age=${14 * 24 * 60 * 60}`,
-  ].filter(Boolean);
-
-  return parts.join("; ");
+    isProd ? "Secure" : "",
+  ].filter(Boolean).join("; ");
 }
 
 export const handler: Handler = async (event) => {
   if (event.httpMethod !== "POST") return json(405, { error: "Method Not Allowed" });
 
-  // ✅ obligatoire pour Blobs avec @netlify/functions Handler
+  // ✅ obligatoire pour Blobs en functions “lambda compat”
   connectLambda(event as unknown as LambdaEventLike);
 
   let payload: any;
@@ -73,24 +67,25 @@ export const handler: Handler = async (event) => {
   if (!username || !password) return json(400, { error: "Missing username/password" });
 
   const store = getStore("auth");
-  const key = `users/${username}.json`;
+  const userKey = `users/${username}.json`;
 
-  const user = await store.get(key, { type: "json" }).catch(() => null);
+  const user = await store.get(userKey, { type: "json" }).catch(() => null);
   if (!user) return json(401, { error: "Invalid credentials" });
 
   const role = String((user as any).role || "player");
-  const hash = String((user as any).passwordHash || "");
+  const passwordHash = String((user as any).passwordHash || "");
 
-  if (!verifyPassword(password, hash)) return json(401, { error: "Invalid credentials" });
+  if (!verifyPbkdf2(password, passwordHash)) {
+    return json(401, { error: "Invalid credentials" });
+  }
 
-  // JWT compatible avec ton auth-me.ts (sub + role)
   const token = jwt.sign({ role }, JWT_SECRET, { subject: username, expiresIn: "14d" });
 
   return {
     statusCode: 200,
     headers: {
       "content-type": "application/json; charset=utf-8",
-      "set-cookie": buildSetCookie(COOKIE_NAME, token),
+      "set-cookie": cookieHeader(COOKIE_NAME, token),
     },
     body: JSON.stringify({ ok: true, username, role }),
   };
