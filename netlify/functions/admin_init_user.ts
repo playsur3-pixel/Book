@@ -1,8 +1,9 @@
 import type { Handler } from "@netlify/functions";
-import { getStore } from "@netlify/blobs";
+import { connectLambda, getStore } from "@netlify/blobs";
 import crypto from "node:crypto";
 
-type Role = "admin" | "coach" | "player";
+type Role = "admin" | "coach" | "player";   
+type LambdaEventLike = any;
 
 function json(statusCode: number, body: any) {
   return {
@@ -16,7 +17,6 @@ function normalizeUsername(u: string) {
   return u.trim().toUpperCase().replace(/\s+/g, "_");
 }
 
-// pbkdf2 simple (sans lib externe)
 function hashPassword(password: string) {
   const salt = crypto.randomBytes(16).toString("hex");
   const iter = 120000;
@@ -28,6 +28,9 @@ function hashPassword(password: string) {
 
 export const handler: Handler = async (event) => {
   if (event.httpMethod !== "POST") return json(405, { error: "Method Not Allowed" });
+
+  // ✅ IMPORTANT en Lambda compatibility
+  connectLambda(event as unknown as LambdaEventLike);
 
   const adminSecret = process.env.ADMIN_SECRET;
   if (!adminSecret) return json(500, { error: "Missing ADMIN_SECRET env var" });
