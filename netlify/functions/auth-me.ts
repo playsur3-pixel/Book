@@ -2,7 +2,7 @@ import type { Handler } from "@netlify/functions";
 import jwt from "jsonwebtoken";
 import { getCookie, json } from "./_utils";
 
-const COOKIE_NAME = process.env.AUTH_COOKIE_NAME || "playsure_token";
+const COOKIE_NAME = process.env.AUTH_COOKIE_NAME || "adminbook";
 const JWT_SECRET = process.env.AUTH_JWT_SECRET || "dev-secret";
 
 export const handler: Handler = async (event) => {
