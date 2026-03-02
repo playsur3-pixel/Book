@@ -16,14 +16,14 @@ function normalizeUsername(u: string) {
   return u.trim().toUpperCase().replace(/\s+/g, "_");
 }
 
-// Hash PBKDF2 (pas besoin de lib)
-function hashPassword(password: string, salt?: string) {
-  const _salt = salt ?? crypto.randomBytes(16).toString("hex");
+// pbkdf2 simple (sans lib externe)
+function hashPassword(password: string) {
+  const salt = crypto.randomBytes(16).toString("hex");
   const iter = 120000;
   const keylen = 32;
   const digest = "sha256";
-  const derived = crypto.pbkdf2Sync(password, _salt, iter, keylen, digest).toString("hex");
-  return `pbkdf2$${digest}$${iter}$${_salt}$${derived}`;
+  const derived = crypto.pbkdf2Sync(password, salt, iter, keylen, digest).toString("hex");
+  return `pbkdf2$${digest}$${iter}$${salt}$${derived}`;
 }
 
 export const handler: Handler = async (event) => {
@@ -52,19 +52,16 @@ export const handler: Handler = async (event) => {
 
   const username = normalizeUsername(usernameRaw);
 
-  const store = getStore("auth"); // namespace blobs "auth"
+  const store = getStore("auth");
   const key = `users/${username}.json`;
 
-  // Empêche d’écraser un compte existant
   const existing = await store.get(key, { type: "json" }).catch(() => null);
   if (existing) return json(409, { error: "User already exists", username });
-
-  const passwordHash = hashPassword(password);
 
   await store.setJSON(key, {
     username,
     role,
-    passwordHash,
+    passwordHash: hashPassword(password),
     createdAt: new Date().toISOString(),
   });
 
